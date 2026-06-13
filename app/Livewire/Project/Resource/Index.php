@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\Environment;
 use App\Models\Project;
+use App\Services\ResourceFlowBuilder;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -171,7 +172,42 @@ class Index extends Component
             'dragonfliesJs' => $this->toSearchableArray($this->dragonflies),
             'clickhousesJs' => $this->toSearchableArray($this->clickhouses),
             'servicesJs' => $this->toSearchableArray($this->services),
+            'resourceFlow' => ResourceFlowBuilder::build(
+                projectName: $this->project->name,
+                environmentName: $this->environment->name,
+                resources: $this->toFlowResources(),
+            ),
         ]);
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function toFlowResources(): Collection
+    {
+        return collect()
+            ->merge($this->toTypedSearchableArray($this->applications, 'application'))
+            ->merge($this->toTypedSearchableArray($this->postgresqls, 'database'))
+            ->merge($this->toTypedSearchableArray($this->redis, 'database'))
+            ->merge($this->toTypedSearchableArray($this->mongodbs, 'database'))
+            ->merge($this->toTypedSearchableArray($this->mysqls, 'database'))
+            ->merge($this->toTypedSearchableArray($this->mariadbs, 'database'))
+            ->merge($this->toTypedSearchableArray($this->keydbs, 'database'))
+            ->merge($this->toTypedSearchableArray($this->dragonflies, 'database'))
+            ->merge($this->toTypedSearchableArray($this->clickhouses, 'database'))
+            ->merge($this->toTypedSearchableArray($this->services, 'service'))
+            ->values();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function toTypedSearchableArray(Collection $items, string $type): array
+    {
+        return collect($this->toSearchableArray($items))
+            ->map(fn (array $item): array => ['type' => $type, ...$item])
+            ->values()
+            ->toArray();
     }
 
     private function toSearchableArray(Collection $items): array

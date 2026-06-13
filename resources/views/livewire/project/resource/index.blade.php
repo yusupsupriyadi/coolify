@@ -191,6 +191,27 @@
         </nav>
     </div>
     @if ($environment->isEmpty())
+        @php($resourceFlowDataId = 'resource-flow-data-'.data_get($environment, 'uuid'))
+        <script type="application/json" id="{{ $resourceFlowDataId }}">@json($resourceFlow)</script>
+        <div class="mb-4 overflow-hidden border rounded-lg border-neutral-200 dark:border-coolgray-200 bg-white dark:bg-coolgray-100">
+            <div
+                class="flex flex-col gap-3 px-4 py-3 border-b border-neutral-200 dark:border-coolgray-200 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <div class="text-sm font-semibold text-neutral-800 dark:text-white">Resource Flow</div>
+                    <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                        Railway-style canvas grouped by environment, server, and resource.
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 text-xs text-neutral-600 dark:text-neutral-300">
+                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.total') }} resources</span>
+                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.applications') }} apps</span>
+                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.databases') }} databases</span>
+                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.services') }} services</span>
+                </div>
+            </div>
+            <div data-resource-flow-canvas data-flow-source="{{ $resourceFlowDataId }}" wire:ignore
+                class="h-[560px] w-full bg-base"></div>
+        </div>
         @can('createAnyResource')
             <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
                 {{ wireNavigate() }} class="items-center justify-center coolbox">+ Add Resource</a>
@@ -207,6 +228,27 @@
     @else
         <div x-data="searchComponent()">
             <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
+            @php($resourceFlowDataId = 'resource-flow-data-'.data_get($environment, 'uuid'))
+            <script type="application/json" id="{{ $resourceFlowDataId }}">@json($resourceFlow)</script>
+            <div class="mt-4 overflow-hidden border rounded-lg border-neutral-200 dark:border-coolgray-200 bg-white dark:bg-coolgray-100">
+                <div
+                    class="flex flex-col gap-3 px-4 py-3 border-b border-neutral-200 dark:border-coolgray-200 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div class="text-sm font-semibold text-neutral-800 dark:text-white">Resource Flow</div>
+                        <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                            Railway-style canvas grouped by environment, server, and resource.
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs text-neutral-600 dark:text-neutral-300">
+                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.total') }} resources</span>
+                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.applications') }} apps</span>
+                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.databases') }} databases</span>
+                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.services') }} services</span>
+                    </div>
+                </div>
+                <div data-resource-flow-canvas data-flow-source="{{ $resourceFlowDataId }}" wire:ignore
+                    class="h-[560px] w-full bg-base"></div>
+            </div>
             <template
                 x-if="filteredApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0">
                 <div class="flex flex-col items-center justify-center p-8 text-center">
