@@ -137,6 +137,21 @@ it('maps docker apps and every database engine to the right icon', function () {
     }
 });
 
+it('exposes status metadata and node ids matching build() for live updates', function () {
+    expect(ResourceFlowBuilder::statusMeta('running:healthy'))->toBe(['Online', '#22c55e']);
+    expect(ResourceFlowBuilder::statusMeta('running:unhealthy'))->toBe(['Degraded', '#fcd452']);
+    expect(ResourceFlowBuilder::statusMeta('starting'))->toBe(['Deploying', '#fcd452']);
+    expect(ResourceFlowBuilder::statusMeta('exited'))->toBe(['Offline', '#ef4444']);
+    expect(ResourceFlowBuilder::statusMeta(''))->toBe(['Unknown', '#737373']);
+
+    // The id helper must produce the same id build() assigns, so live status patches hit the right node.
+    $flow = ResourceFlowBuilder::build('Acme', 'production', collect([
+        flowResource(['type' => 'database', 'subtype' => 'standalone-redis', 'uuid' => 'Db-XYZ', 'name' => 'cache']),
+    ]));
+    $node = collect($flow['nodes'])->firstWhere('type', 'resource');
+    expect(ResourceFlowBuilder::resourceNodeId('database', 'Db-XYZ'))->toBe($node['id']);
+});
+
 it('returns an empty canvas when there are no resources', function () {
     $flow = ResourceFlowBuilder::build('Acme', 'production', collect());
 

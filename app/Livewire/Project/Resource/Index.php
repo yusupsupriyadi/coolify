@@ -40,6 +40,8 @@ class Index extends Component
 
     protected Collection $services;
 
+    private bool $resourcesLoaded = false;
+
     public function mount(): void
     {
         $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
@@ -84,6 +86,10 @@ class Index extends Component
      */
     private function loadResources(): void
     {
+        if ($this->resourcesLoaded) {
+            return;
+        }
+
         $this->environment->loadCount([
             'applications', 'redis', 'postgresqls', 'mysqls', 'keydbs',
             'dragonflies', 'clickhouses', 'mariadbs', 'mongodbs', 'services',
@@ -129,6 +135,8 @@ class Index extends Component
 
             return $service;
         });
+
+        $this->resourcesLoaded = true;
     }
 
     public function render()
@@ -184,6 +192,47 @@ class Index extends Component
             ->merge($this->mapFlowResources($this->clickhouses, 'database', $databaseSubtype))
             ->merge($this->mapFlowResources($this->services, 'service', fn ($service): string => 'service'))
             ->values();
+    }
+
+    /**
+     * Polled by the canvas to push fresh statuses into the React nodes in
+     * place, without resetting the layout or zoom.
+     */
+    public function pollStatuses(): void
+    {
+        $this->loadResources();
+
+        $this->dispatch('resource-flow:statuses', statuses: $this->statusMap());
+    }
+
+    /**
+     * @return array<string, array{status: string, statusLabel: string, statusColor: string}>
+     */
+    private function statusMap(): array
+    {
+        $map = [];
+
+        $collect = function (Collection $items, string $type) use (&$map): void {
+            foreach ($items as $item) {
+                $status = (string) ($item->status ?? '');
+                [$label, $color] = ResourceFlowBuilder::statusMeta($status);
+                $map[ResourceFlowBuilder::resourceNodeId($type, (string) $item->uuid)] = [
+                    'status' => $status,
+                    'statusLabel' => $label,
+                    'statusColor' => $color,
+                ];
+            }
+        };
+
+        $collect($this->applications, 'application');
+
+        foreach (['postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'keydbs', 'dragonflies', 'clickhouses'] as $relation) {
+            $collect($this->{$relation}, 'database');
+        }
+
+        $collect($this->services, 'service');
+
+        return $map;
     }
 
     /**

@@ -204,10 +204,15 @@ class ResourceFlowBuilder
         return null;
     }
 
+    public static function resourceNodeId(string $type, string $uuid): string
+    {
+        return self::nodeId('resource-'.$type, $uuid);
+    }
+
     /**
      * @return array{0: string, 1: string}
      */
-    private static function statusMeta(string $status): array
+    public static function statusMeta(string $status): array
     {
         $status = strtolower($status);
 

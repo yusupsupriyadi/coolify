@@ -15,6 +15,14 @@ import {
 import '@xyflow/react/dist/style.css';
 
 const roots = new WeakMap();
+const statusUpdaters = new Set();
+let statusListenerBound = false;
+
+window.updateResourceFlowStatuses = (statuses) => {
+    if (statuses) {
+        statusUpdaters.forEach((fn) => fn(statuses));
+    }
+};
 
 let stylesInjected = false;
 
@@ -183,6 +191,22 @@ function ResourceFlowCanvas({ flow, meta }) {
         setEdges(styleEdges(flow.edges));
     }, [flow, setNodes, setEdges]);
 
+    // Live status updates (wire:poll) patch matching nodes in place, preserving layout/zoom.
+    useEffect(() => {
+        const updater = (statuses) => {
+            setNodes((prev) => prev.map((node) => {
+                if (node.type !== 'resource') {
+                    return node;
+                }
+                const next = statuses[node.id];
+                return next ? { ...node, data: { ...node.data, ...next } } : node;
+            }));
+        };
+        statusUpdaters.add(updater);
+
+        return () => statusUpdaters.delete(updater);
+    }, [setNodes]);
+
     const onNodeClick = useCallback((_event, node) => {
         if (node?.type === 'resource' && node.data) {
             window.dispatchEvent(new CustomEvent('resource-flow:open', { detail: node.data }));
@@ -259,6 +283,14 @@ function ResourceFlowCanvas({ flow, meta }) {
 
 export function mountResourceFlows() {
     injectStyles();
+
+    if (!statusListenerBound && window.Livewire) {
+        statusListenerBound = true;
+        window.Livewire.on('resource-flow:statuses', (payload) => {
+            const statuses = payload?.statuses ?? (Array.isArray(payload) ? payload[0]?.statuses : null);
+            window.updateResourceFlowStatuses(statuses);
+        });
+    }
 
     document.querySelectorAll('[data-resource-flow-canvas]').forEach((container) => {
         const sourceId = container.getAttribute('data-flow-source');
