@@ -229,7 +229,8 @@
 
         <script type="application/json" id="{{ $resourceFlowDataId }}">@json($resourceFlow)</script>
         <div x-show="view === 'canvas'" wire:poll.30s.visible="pollStatuses"
-            @resource-flow:sync.window="$wire.$refresh().then(() => window.mountResourceFlows && window.mountResourceFlows())">
+            @resource-flow:sync.window="$wire.$refresh().then(() => window.mountResourceFlows && window.mountResourceFlows())"
+            @resource-flow:layout.window="$wire.saveLayout($event.detail)">
             <div data-resource-flow-canvas data-flow-source="{{ $resourceFlowDataId }}"
                 @if ($canAddResource) data-add-url="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" @endif
                 data-project="{{ $project->name }}" data-environment="{{ $environment->name }}" wire:ignore

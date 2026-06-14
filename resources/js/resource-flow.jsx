@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
     Background,
@@ -207,10 +207,24 @@ function ResourceFlowCanvas({ flow, meta }) {
         return () => statusUpdaters.delete(updater);
     }, [setNodes]);
 
+    // Keep a live reference to node positions so drag-stop can persist them.
+    const nodesRef = useRef(nodes);
+    useEffect(() => {
+        nodesRef.current = nodes;
+    }, [nodes]);
+
     const onNodeClick = useCallback((_event, node) => {
         if (node?.type === 'resource' && node.data) {
             window.dispatchEvent(new CustomEvent('resource-flow:open', { detail: node.data }));
         }
+    }, []);
+
+    const onNodeDragStop = useCallback(() => {
+        const positions = {};
+        nodesRef.current.forEach((node) => {
+            positions[node.id] = { x: Math.round(node.position.x), y: Math.round(node.position.y) };
+        });
+        window.dispatchEvent(new CustomEvent('resource-flow:layout', { detail: positions }));
     }, []);
 
     const onSync = useCallback(() => {
@@ -226,6 +240,7 @@ function ResourceFlowCanvas({ flow, meta }) {
             onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
+            onNodeDragStop={onNodeDragStop}
             fitView
             fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
             minZoom={0.2}

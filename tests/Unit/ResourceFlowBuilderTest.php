@@ -152,6 +152,21 @@ it('exposes status metadata and node ids matching build() for live updates', fun
     expect(ResourceFlowBuilder::resourceNodeId('database', 'Db-XYZ'))->toBe($node['id']);
 });
 
+it('applies saved node positions when provided', function () {
+    $resources = collect([
+        flowResource(['type' => 'application', 'subtype' => 'git', 'uuid' => 'app-1', 'name' => 'web', 'server' => 'alpha']),
+    ]);
+
+    $nodeId = ResourceFlowBuilder::resourceNodeId('application', 'app-1');
+
+    $flow = ResourceFlowBuilder::build('Acme', 'production', $resources, [], [
+        $nodeId => ['x' => 999, 'y' => 777],
+    ]);
+
+    $node = collect($flow['nodes'])->firstWhere('id', $nodeId);
+    expect($node['position'])->toBe(['x' => 999.0, 'y' => 777.0]);
+});
+
 it('returns an empty canvas when there are no resources', function () {
     $flow = ResourceFlowBuilder::build('Acme', 'production', collect());
 

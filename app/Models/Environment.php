@@ -30,7 +30,15 @@ class Environment extends BaseModel
         'description',
         'project_id',
         'uuid',
+        'resource_flow_layout',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'resource_flow_layout' => 'array',
+        ];
+    }
 
     protected static function booted()
     {

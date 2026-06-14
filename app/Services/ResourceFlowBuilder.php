@@ -31,13 +31,14 @@ class ResourceFlowBuilder
      *
      * @param  Collection<int, array<string, mixed>>  $resources
      * @param  array<int, array{from: string, fromType: string, to: string, toType: string}>  $connections
+     * @param  array<string, array{x: int|float, y: int|float}>  $savedPositions
      * @return array{
      *     nodes: array<int, array<string, mixed>>,
      *     edges: array<int, array<string, mixed>>,
      *     summary: array{total: int, applications: int, databases: int, services: int, servers: int}
      * }
      */
-    public static function build(string $projectName, string $environmentName, Collection $resources, array $connections = []): array
+    public static function build(string $projectName, string $environmentName, Collection $resources, array $connections = [], array $savedPositions = []): array
     {
         $resources = $resources
             ->sortBy([
@@ -65,7 +66,8 @@ class ResourceFlowBuilder
             $groupHeight = $innerHeight + self::GROUP_PAD_TOP + self::GROUP_PAD_BOTTOM;
 
             $groupId = self::nodeId('group-server', (string) $serverName);
-            $nodes[] = self::groupNode($groupId, (string) $serverName, $count, $groupX, 0, $groupWidth, $groupHeight);
+            $groupPos = self::positionFor($savedPositions, $groupId, $groupX, 0);
+            $nodes[] = self::groupNode($groupId, (string) $serverName, $count, $groupPos['x'], $groupPos['y'], $groupWidth, $groupHeight);
 
             foreach ($serverResources as $index => $resource) {
                 $column = $index % $columns;
@@ -75,7 +77,8 @@ class ResourceFlowBuilder
 
                 $resourceId = self::nodeId('resource-'.$resource['type'], (string) $resource['uuid']);
                 $nodeIdByUuid[(string) $resource['uuid']] = $resourceId;
-                $nodes[] = self::resourceNode($resourceId, $groupId, $resource, $x, $y);
+                $pos = self::positionFor($savedPositions, $resourceId, $x, $y);
+                $nodes[] = self::resourceNode($resourceId, $groupId, $resource, $pos['x'], $pos['y']);
             }
 
             $groupX += $groupWidth + self::GROUP_GAP_X;
@@ -134,9 +137,24 @@ class ResourceFlowBuilder
     }
 
     /**
+     * @param  array<string, array{x: int|float, y: int|float}>  $saved
+     * @return array{x: int|float, y: int|float}
+     */
+    private static function positionFor(array $saved, string $id, int|float $defaultX, int|float $defaultY): array
+    {
+        $pos = $saved[$id] ?? null;
+
+        if (is_array($pos) && isset($pos['x'], $pos['y']) && is_numeric($pos['x']) && is_numeric($pos['y'])) {
+            return ['x' => (float) $pos['x'], 'y' => (float) $pos['y']];
+        }
+
+        return ['x' => $defaultX, 'y' => $defaultY];
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private static function groupNode(string $id, string $serverName, int $resourceCount, int $x, int $y, int $width, int $height): array
+    private static function groupNode(string $id, string $serverName, int $resourceCount, int|float $x, int|float $y, int $width, int $height): array
     {
         return [
             'id' => $id,
@@ -157,7 +175,7 @@ class ResourceFlowBuilder
      * @param  array<string, mixed>  $resource
      * @return array<string, mixed>
      */
-    private static function resourceNode(string $id, string $parentId, array $resource, int $x, int $y): array
+    private static function resourceNode(string $id, string $parentId, array $resource, int|float $x, int|float $y): array
     {
         $status = (string) ($resource['status'] ?? '');
         [$statusLabel, $statusColor] = self::statusMeta($status);

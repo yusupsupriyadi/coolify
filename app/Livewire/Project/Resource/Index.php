@@ -169,6 +169,7 @@ class Index extends Component
                 environmentName: $this->environment->name,
                 resources: $this->toFlowResources(),
                 connections: $this->resolveConnections(),
+                savedPositions: is_array($this->environment->resource_flow_layout) ? $this->environment->resource_flow_layout : [],
             ),
         ]);
     }
@@ -203,6 +204,36 @@ class Index extends Component
         $this->loadResources();
 
         $this->dispatch('resource-flow:statuses', statuses: $this->statusMap());
+    }
+
+    /**
+     * Persist canvas node positions (per environment) so a dragged layout
+     * survives reloads.
+     *
+     * @param  array<string, array{x: mixed, y: mixed}>  $positions
+     */
+    public function saveLayout(array $positions): void
+    {
+        $clean = [];
+
+        foreach ($positions as $id => $pos) {
+            if (! is_string($id) || ! is_array($pos)) {
+                continue;
+            }
+
+            if (! isset($pos['x'], $pos['y']) || ! is_numeric($pos['x']) || ! is_numeric($pos['y'])) {
+                continue;
+            }
+
+            $clean[$id] = ['x' => round((float) $pos['x'], 2), 'y' => round((float) $pos['y'], 2)];
+
+            if (count($clean) >= 1000) {
+                break;
+            }
+        }
+
+        $this->environment->resource_flow_layout = $clean;
+        $this->environment->save();
     }
 
     /**
