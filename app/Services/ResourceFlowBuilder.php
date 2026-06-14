@@ -23,7 +23,7 @@ class ResourceFlowBuilder
 
     private const GROUP_GAP_X = 96;
 
-    private const MAX_COLUMNS = 2;
+    private const MAX_COLUMNS = 5;
 
     /**
      * Build a Railway-style, resource-centric canvas: every resource is a card,
@@ -57,7 +57,9 @@ class ResourceFlowBuilder
         foreach ($resourcesByServer as $serverName => $serverResources) {
             $serverResources = $serverResources->values();
             $count = $serverResources->count();
-            $columns = (int) min(self::MAX_COLUMNS, max(1, $count));
+            // Square-ish layout: keep small groups compact (2 cards => 2 cols, like
+            // Railway) but spread dense single-server groups so they aren't a tall strip.
+            $columns = (int) min(self::MAX_COLUMNS, max(1, (int) ceil(sqrt($count))));
             $rows = (int) ceil($count / $columns);
 
             $innerWidth = ($columns * self::CARD_WIDTH) + (($columns - 1) * self::CARD_GAP_X);

@@ -152,6 +152,20 @@ it('exposes status metadata and node ids matching build() for live updates', fun
     expect(ResourceFlowBuilder::resourceNodeId('database', 'Db-XYZ'))->toBe($node['id']);
 });
 
+it('spreads dense single-server groups across multiple columns', function () {
+    $resources = collect(range(1, 9))->map(fn (int $i): array => flowResource([
+        'uuid' => "app-{$i}", 'name' => "app-{$i}", 'server' => 'alpha',
+    ]));
+
+    $flow = ResourceFlowBuilder::build('Acme', 'production', $resources);
+    $resourceNodes = collect($flow['nodes'])->where('type', 'resource');
+
+    // 9 resources => ceil(sqrt(9)) = 3 columns, so the top row holds 3 cards.
+    $topRowY = $resourceNodes->min(fn (array $n) => $n['position']['y']);
+    $topRow = $resourceNodes->filter(fn (array $n): bool => $n['position']['y'] === $topRowY);
+    expect($topRow->count())->toBe(3);
+});
+
 it('applies saved node positions when provided', function () {
     $resources = collect([
         flowResource(['type' => 'application', 'subtype' => 'git', 'uuid' => 'app-1', 'name' => 'web', 'server' => 'alpha']),
