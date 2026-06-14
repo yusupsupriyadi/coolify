@@ -74,30 +74,27 @@ class Index extends Component
             ])
             ->get();
 
-        $this->environment = $environment->loadCount([
-            'applications',
-            'redis',
-            'postgresqls',
-            'mysqls',
-            'keydbs',
-            'dragonflies',
-            'clickhouses',
-            'mariadbs',
-            'mongodbs',
-            'services',
+        $this->environment = $environment;
+    }
+
+    /**
+     * Load all resources for the environment. Called from render() (not mount)
+     * so that a Livewire refresh/poll — e.g. the canvas "Sync" button — always
+     * rebuilds the flow with fresh data and live statuses.
+     */
+    private function loadResources(): void
+    {
+        $this->environment->loadCount([
+            'applications', 'redis', 'postgresqls', 'mysqls', 'keydbs',
+            'dragonflies', 'clickhouses', 'mariadbs', 'mongodbs', 'services',
         ]);
 
-        // Eager load relationships for applications
-        $this->applications = $this->environment->applications()->with([
-            'tags',
-            'destination.server.settings',
-            'settings',
-            'persistentStorages',
-            'environment_variables',
-        ])->get()->sortBy('name');
         $projectUuid = $this->project->uuid;
         $environmentUuid = $this->environment->uuid;
-        $this->applications = $this->applications->map(function ($application) use ($projectUuid, $environmentUuid) {
+
+        $this->applications = $this->environment->applications()->with([
+            'tags', 'destination.server.settings', 'settings', 'persistentStorages', 'environment_variables',
+        ])->get()->sortBy('name')->map(function ($application) use ($projectUuid, $environmentUuid) {
             $application->hrefLink = route('project.application.configuration', [
                 'project_uuid' => $projectUuid,
                 'environment_uuid' => $environmentUuid,
@@ -107,25 +104,10 @@ class Index extends Component
             return $application;
         });
 
-        // Load all database resources in a single query per type
-        $databaseTypes = [
-            'postgresqls' => 'postgresqls',
-            'redis' => 'redis',
-            'mongodbs' => 'mongodbs',
-            'mysqls' => 'mysqls',
-            'mariadbs' => 'mariadbs',
-            'keydbs' => 'keydbs',
-            'dragonflies' => 'dragonflies',
-            'clickhouses' => 'clickhouses',
-        ];
-
-        foreach ($databaseTypes as $property => $relation) {
-            $this->{$property} = $this->environment->{$relation}()->with([
-                'tags',
-                'destination.server.settings',
-                'persistentStorages',
-            ])->get()->sortBy('name');
-            $this->{$property} = $this->{$property}->map(function ($db) use ($projectUuid, $environmentUuid) {
+        foreach (['postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'keydbs', 'dragonflies', 'clickhouses'] as $relation) {
+            $this->{$relation} = $this->environment->{$relation}()->with([
+                'tags', 'destination.server.settings', 'persistentStorages',
+            ])->get()->sortBy('name')->map(function ($db) use ($projectUuid, $environmentUuid) {
                 $db->hrefLink = route('project.database.configuration', [
                     'project_uuid' => $projectUuid,
                     'database_uuid' => $db->uuid,
@@ -136,12 +118,9 @@ class Index extends Component
             });
         }
 
-        // Load services with their tags and server
         $this->services = $this->environment->services()->with([
-            'tags',
-            'destination.server.settings',
-        ])->get()->sortBy('name');
-        $this->services = $this->services->map(function ($service) use ($projectUuid, $environmentUuid) {
+            'tags', 'destination.server.settings',
+        ])->get()->sortBy('name')->map(function ($service) use ($projectUuid, $environmentUuid) {
             $service->hrefLink = route('project.service.configuration', [
                 'project_uuid' => $projectUuid,
                 'environment_uuid' => $environmentUuid,
@@ -154,6 +133,8 @@ class Index extends Component
 
     public function render()
     {
+        $this->loadResources();
+
         return view('livewire.project.resource.index', [
             'applications' => $this->applications,
             'postgresqls' => $this->postgresqls,

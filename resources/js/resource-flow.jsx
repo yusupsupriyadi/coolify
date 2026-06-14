@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
     Background,
@@ -9,6 +9,8 @@ import {
     Panel,
     Position,
     ReactFlow,
+    useEdgesState,
+    useNodesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -149,6 +151,16 @@ const nodeTypes = {
     resource: ResourceNode,
 };
 
+function styleEdges(rawEdges) {
+    return (rawEdges || []).map((edge) => ({
+        type: 'smoothstep',
+        animated: false,
+        ...edge,
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#52525b', width: 18, height: 18 },
+        style: { stroke: '#52525b', strokeWidth: 1.5 },
+    }));
+}
+
 function navigateTo(href) {
     if (!href) {
         return;
@@ -161,15 +173,15 @@ function navigateTo(href) {
 }
 
 function ResourceFlowCanvas({ flow, meta }) {
-    const nodes = useMemo(() => flow.nodes || [], [flow]);
-    const edges = useMemo(() => (flow.edges || []).map((edge) => ({
-        type: 'smoothstep',
-        animated: false,
-        ...edge,
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#52525b', width: 18, height: 18 },
-        style: { stroke: '#52525b', strokeWidth: 1.5 },
-    })), [flow]);
+    const [nodes, setNodes, onNodesChange] = useNodesState(flow.nodes || []);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(styleEdges(flow.edges));
     const total = flow.summary?.total || 0;
+
+    // Re-sync nodes/edges when a fresh payload arrives (e.g. after the Sync button).
+    useEffect(() => {
+        setNodes(flow.nodes || []);
+        setEdges(styleEdges(flow.edges));
+    }, [flow, setNodes, setEdges]);
 
     const onNodeClick = useCallback((_event, node) => {
         if (node?.type === 'resource' && node.data) {
@@ -186,6 +198,8 @@ function ResourceFlowCanvas({ flow, meta }) {
             className="rf-canvas"
             nodes={nodes}
             edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
             fitView
