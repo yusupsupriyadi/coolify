@@ -93,6 +93,7 @@ class Index extends Component
             'destination.server.settings',
             'settings',
             'persistentStorages',
+            'environment_variables',
         ])->get()->sortBy('name');
         $projectUuid = $this->project->uuid;
         $environmentUuid = $this->environment->uuid;
@@ -178,6 +179,7 @@ class Index extends Component
                 projectName: $this->project->name,
                 environmentName: $this->environment->name,
                 resources: $this->toFlowResources(),
+                connections: $this->resolveConnections(),
             ),
         ]);
     }
@@ -201,6 +203,71 @@ class Index extends Component
             ->merge($this->mapFlowResources($this->clickhouses, 'database', $databaseSubtype))
             ->merge($this->mapFlowResources($this->services, 'service', fn ($service): string => 'service'))
             ->values();
+    }
+
+    /**
+     * Derive connections between resources by scanning each application's
+     * environment variable values for another resource's uuid (Coolify uses
+     * the resource uuid as the internal container hostname).
+     *
+     * @return array<int, array{from: string, fromType: string, to: string, toType: string}>
+     */
+    private function resolveConnections(): array
+    {
+        try {
+            $targets = [];
+            $groups = [
+                ['items' => $this->applications, 'type' => 'application'],
+                ['items' => $this->postgresqls, 'type' => 'database'],
+                ['items' => $this->redis, 'type' => 'database'],
+                ['items' => $this->mongodbs, 'type' => 'database'],
+                ['items' => $this->mysqls, 'type' => 'database'],
+                ['items' => $this->mariadbs, 'type' => 'database'],
+                ['items' => $this->keydbs, 'type' => 'database'],
+                ['items' => $this->dragonflies, 'type' => 'database'],
+                ['items' => $this->clickhouses, 'type' => 'database'],
+                ['items' => $this->services, 'type' => 'service'],
+            ];
+
+            foreach ($groups as $group) {
+                foreach ($group['items'] as $item) {
+                    $targets[(string) $item->uuid] = $group['type'];
+                }
+            }
+
+            $connections = [];
+
+            foreach ($this->applications as $application) {
+                if (! $application->relationLoaded('environment_variables')) {
+                    continue;
+                }
+
+                $haystack = $application->environment_variables->pluck('value')->filter()->implode("\n");
+
+                if ($haystack === '') {
+                    continue;
+                }
+
+                foreach ($targets as $uuid => $type) {
+                    if ($uuid === (string) $application->uuid) {
+                        continue;
+                    }
+
+                    if (str_contains($haystack, $uuid)) {
+                        $connections[] = [
+                            'from' => (string) $application->uuid,
+                            'fromType' => 'application',
+                            'to' => $uuid,
+                            'toType' => $type,
+                        ];
+                    }
+                }
+            }
+
+            return $connections;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /**

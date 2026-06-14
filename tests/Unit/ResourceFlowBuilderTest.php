@@ -88,6 +88,31 @@ it('builds resource-centric nodes grouped into Railway-style server containers',
     expect($ids->search($alpha['id']))->toBeLessThan($ids->search($web['id']));
 });
 
+it('draws edges between resources that reference each other', function () {
+    $resources = collect([
+        flowResource(['type' => 'application', 'subtype' => 'git', 'uuid' => 'app-1', 'name' => 'web', 'server' => 'alpha']),
+        flowResource(['type' => 'database', 'subtype' => 'standalone-postgresql', 'uuid' => 'db-1', 'name' => 'pg', 'server' => 'alpha']),
+    ]);
+
+    $connections = [
+        ['from' => 'app-1', 'fromType' => 'application', 'to' => 'db-1', 'toType' => 'database'],
+    ];
+
+    $flow = ResourceFlowBuilder::build('Acme', 'production', $resources, $connections);
+
+    expect($flow['edges'])->toHaveCount(1);
+
+    $edge = $flow['edges'][0];
+    expect($edge['source'])->toBe('resource-application-app-1');
+    expect($edge['target'])->toBe('resource-database-db-1');
+
+    // connections referencing a resource that is not on the canvas are skipped
+    $flow = ResourceFlowBuilder::build('Acme', 'production', $resources, [
+        ['from' => 'app-1', 'fromType' => 'application', 'to' => 'ghost', 'toType' => 'database'],
+    ]);
+    expect($flow['edges'])->toBe([]);
+});
+
 it('maps docker apps and every database engine to the right icon', function () {
     $cases = [
         ['application', 'docker', '/svgs/docker.svg'],

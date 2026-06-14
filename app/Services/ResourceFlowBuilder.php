@@ -30,13 +30,14 @@ class ResourceFlowBuilder
      * grouped into a container per server.
      *
      * @param  Collection<int, array<string, mixed>>  $resources
+     * @param  array<int, array{from: string, fromType: string, to: string, toType: string}>  $connections
      * @return array{
      *     nodes: array<int, array<string, mixed>>,
      *     edges: array<int, array<string, mixed>>,
      *     summary: array{total: int, applications: int, databases: int, services: int, servers: int}
      * }
      */
-    public static function build(string $projectName, string $environmentName, Collection $resources): array
+    public static function build(string $projectName, string $environmentName, Collection $resources, array $connections = []): array
     {
         $resources = $resources
             ->sortBy([
@@ -47,6 +48,7 @@ class ResourceFlowBuilder
             ->values();
 
         $nodes = [];
+        $nodeIdByUuid = [];
         $resourcesByServer = $resources->groupBy(fn (array $resource): string => self::serverName($resource));
 
         $groupX = 0;
@@ -72,6 +74,7 @@ class ResourceFlowBuilder
                 $y = self::GROUP_PAD_TOP + ($row * (self::CARD_HEIGHT + self::CARD_GAP_Y));
 
                 $resourceId = self::nodeId('resource-'.$resource['type'], (string) $resource['uuid']);
+                $nodeIdByUuid[(string) $resource['uuid']] = $resourceId;
                 $nodes[] = self::resourceNode($resourceId, $groupId, $resource, $x, $y);
             }
 
@@ -80,7 +83,7 @@ class ResourceFlowBuilder
 
         return [
             'nodes' => $nodes,
-            'edges' => [],
+            'edges' => self::buildEdges($connections, $nodeIdByUuid),
             'summary' => [
                 'total' => $resources->count(),
                 'applications' => $resources->where('type', 'application')->count(),
@@ -89,6 +92,45 @@ class ResourceFlowBuilder
                 'servers' => $resourcesByServer->count(),
             ],
         ];
+    }
+
+    /**
+     * @param  array<int, array{from: string, fromType: string, to: string, toType: string}>  $connections
+     * @param  array<string, string>  $nodeIdByUuid
+     * @return array<int, array<string, mixed>>
+     */
+    private static function buildEdges(array $connections, array $nodeIdByUuid): array
+    {
+        $edges = [];
+        $seen = [];
+
+        foreach ($connections as $connection) {
+            $from = (string) ($connection['from'] ?? '');
+            $to = (string) ($connection['to'] ?? '');
+
+            if (! isset($nodeIdByUuid[$from], $nodeIdByUuid[$to]) || $from === $to) {
+                continue;
+            }
+
+            $source = $nodeIdByUuid[$from];
+            $target = $nodeIdByUuid[$to];
+            $id = 'edge-'.$source.'-to-'.$target;
+
+            if (isset($seen[$id])) {
+                continue;
+            }
+
+            $seen[$id] = true;
+            $edges[] = [
+                'id' => $id,
+                'source' => $source,
+                'target' => $target,
+                'sourceHandle' => 'out',
+                'targetHandle' => 'in',
+            ];
+        }
+
+        return $edges;
     }
 
     /**

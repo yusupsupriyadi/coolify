@@ -4,7 +4,10 @@ import {
     Background,
     BackgroundVariant,
     Controls,
+    Handle,
+    MarkerType,
     Panel,
+    Position,
     ReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -43,6 +46,8 @@ function injectStyles() {
             cursor: pointer;
         }
         .rf-card:hover { border-color: #3a3a40; box-shadow: 0 14px 38px rgba(0,0,0,.4); }
+        .rf-handle { width: 7px; height: 7px; min-width: 0; min-height: 0; background: #52525b; border: none; opacity: 0; transition: opacity .12s ease; }
+        .rf-card:hover .rf-handle { opacity: .6; }
         .react-flow__node.selected .rf-card { border-color: #6b16ed; box-shadow: 0 0 0 1px #6b16ed, 0 14px 38px rgba(0,0,0,.45); }
         .rf-card__head { display: flex; align-items: center; gap: 10px; }
         .rf-card__icon { width: 22px; height: 22px; border-radius: 6px; flex: 0 0 auto; object-fit: contain; background: #0e0e10; padding: 2px; }
@@ -108,6 +113,8 @@ function GroupNode({ data }) {
 function ResourceNode({ data }) {
     return (
         <div className="rf-card">
+            <Handle type="target" position={Position.Left} id="in" className="rf-handle" />
+            <Handle type="source" position={Position.Right} id="out" className="rf-handle" />
             <div className="rf-card__head">
                 {data.icon ? (
                     <img
@@ -155,7 +162,13 @@ function navigateTo(href) {
 
 function ResourceFlowCanvas({ flow, meta }) {
     const nodes = useMemo(() => flow.nodes || [], [flow]);
-    const edges = useMemo(() => flow.edges || [], [flow]);
+    const edges = useMemo(() => (flow.edges || []).map((edge) => ({
+        type: 'smoothstep',
+        animated: false,
+        ...edge,
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#52525b', width: 18, height: 18 },
+        style: { stroke: '#52525b', strokeWidth: 1.5 },
+    })), [flow]);
     const total = flow.summary?.total || 0;
 
     const onNodeClick = useCallback((_event, node) => {
