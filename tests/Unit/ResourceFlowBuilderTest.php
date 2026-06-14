@@ -20,7 +20,7 @@ function flowResource(array $overrides = []): array
 
 it('builds resource-centric nodes grouped into Railway-style server containers', function () {
     $resources = collect([
-        flowResource(['uuid' => 'app-1', 'name' => 'web', 'subtype' => 'git', 'server' => 'alpha']),
+        flowResource(['uuid' => 'app-1', 'name' => 'web', 'subtype' => 'git', 'server' => 'alpha', 'links' => ['settings' => '/apps/app-1', 'logs' => '/apps/app-1/logs']]),
         flowResource([
             'type' => 'database',
             'subtype' => 'standalone-postgresql',
@@ -76,6 +76,7 @@ it('builds resource-centric nodes grouped into Railway-style server containers',
     expect($web['data']['statusLabel'])->toBe('Online');
     expect($web['data']['statusColor'])->toBe('#22c55e');
     expect($web['data']['href'])->toBe('/apps/app-1');
+    expect($web['data']['links'])->toBe(['settings' => '/apps/app-1', 'logs' => '/apps/app-1/logs']);
 
     $postgres = $resourceNodes->firstWhere('data.label', 'postgres');
     expect($postgres['data']['kind'])->toBe('database');

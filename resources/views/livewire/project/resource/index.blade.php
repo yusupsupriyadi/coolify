@@ -415,6 +415,78 @@
                 </template>
             </div>
         </div>
+
+        {{-- Railway-style resource detail panel, opened by clicking a canvas node --}}
+        <div x-data="{ open: false, node: {}, openPanel(d) { this.node = d || {}; this.open = true }, close() { this.open = false } }"
+            @resource-flow:open.window="openPanel($event.detail)" @keydown.escape.window="close()">
+            <div x-show="open" x-cloak class="fixed inset-0 z-50" style="display: none">
+                <div x-show="open" x-transition.opacity class="absolute inset-0 bg-black/50" @click="close()"></div>
+                <div x-show="open" x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0"
+                    x-transition:leave-end="translate-x-full"
+                    class="absolute top-0 right-0 w-full h-full max-w-md overflow-y-auto bg-white border-l shadow-2xl dark:bg-coolgray-100 border-neutral-200 dark:border-coolgray-200 scrollbar">
+                    <div class="flex items-start gap-3 p-5 border-b border-neutral-200 dark:border-coolgray-200">
+                        <img :src="node.icon" alt="" x-show="node.icon" x-on:error="$el.style.display='none'"
+                            class="p-1.5 rounded-lg w-9 h-9 bg-neutral-100 dark:bg-coolgray-300" />
+                        <div class="flex-1 min-w-0">
+                            <div class="text-base font-bold text-black truncate dark:text-white" x-text="node.label"></div>
+                            <div class="text-xs tracking-wide text-neutral-500 uppercase" x-text="node.kind"></div>
+                        </div>
+                        <button type="button" @click="close()"
+                            class="text-neutral-400 hover:text-black dark:hover:text-white">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full" :style="`background:${node.statusColor}`"></span>
+                            <span class="text-sm font-semibold" :style="`color:${node.statusColor}`"
+                                x-text="node.statusLabel"></span>
+                        </div>
+                        <dl class="space-y-2 text-sm">
+                            <div class="flex justify-between gap-3" x-show="node.fqdn">
+                                <dt class="text-neutral-500">Domain</dt>
+                                <dd class="truncate">
+                                    <a :href="node.fqdn && (node.fqdn.startsWith('http') ? node.fqdn : 'https://' + node.fqdn)"
+                                        target="_blank" rel="noopener"
+                                        class="text-coollabs dark:text-warning hover:underline" x-text="node.fqdn"></a>
+                                </dd>
+                            </div>
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-neutral-500">Server</dt>
+                                <dd class="truncate" x-text="node.server"></dd>
+                            </div>
+                            <template x-if="node.volumes && node.volumes.length">
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-neutral-500">Volumes</dt>
+                                    <dd class="truncate" x-text="node.volumes.join(', ')"></dd>
+                                </div>
+                            </template>
+                        </dl>
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <a :href="node.links?.settings" wire:navigate x-show="node.links?.settings"
+                                class="justify-center button">Settings</a>
+                            <a :href="node.links?.deployments" wire:navigate x-show="node.links?.deployments"
+                                class="justify-center button">Deployments</a>
+                            <a :href="node.links?.logs" wire:navigate x-show="node.links?.logs"
+                                class="justify-center button">Logs</a>
+                            <a :href="node.links?.terminal" wire:navigate x-show="node.links?.terminal"
+                                class="justify-center button">Terminal</a>
+                            <a :href="node.links?.variables" wire:navigate x-show="node.links?.variables"
+                                class="justify-center button">Variables</a>
+                        </div>
+                        <a :href="node.href" wire:navigate x-show="node.href"
+                            class="flex items-center justify-center w-full text-sm font-semibold text-white rounded-sm h-9 bg-coollabs hover:bg-coollabs-100">
+                            Open resource →
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>

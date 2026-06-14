@@ -288,7 +288,41 @@ class Index extends Component
             'volumes' => $item->relationLoaded('persistentStorages')
                 ? $item->persistentStorages->pluck('name')->filter()->values()->all()
                 : [],
+            'links' => $this->resourceLinks($type, (string) $item->uuid),
         ])->values();
+    }
+
+    /**
+     * Named-route URLs to a resource's action pages, used by the canvas
+     * slide-over panel to jump to the existing (tested) operation screens.
+     *
+     * @return array<string, string>
+     */
+    private function resourceLinks(string $type, string $uuid): array
+    {
+        $projectUuid = $this->project->uuid;
+        $environmentUuid = $this->environment->uuid;
+
+        return match ($type) {
+            'application' => [
+                'settings' => route('project.application.configuration', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'application_uuid' => $uuid]),
+                'deployments' => route('project.application.deployment.index', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'application_uuid' => $uuid]),
+                'logs' => route('project.application.logs', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'application_uuid' => $uuid]),
+                'terminal' => route('project.application.command', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'application_uuid' => $uuid]),
+                'variables' => route('project.application.environment-variables', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'application_uuid' => $uuid]),
+            ],
+            'database' => [
+                'settings' => route('project.database.configuration', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'database_uuid' => $uuid]),
+                'logs' => route('project.database.logs', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'database_uuid' => $uuid]),
+                'terminal' => route('project.database.command', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'database_uuid' => $uuid]),
+            ],
+            'service' => [
+                'settings' => route('project.service.configuration', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'service_uuid' => $uuid]),
+                'logs' => route('project.service.logs', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'service_uuid' => $uuid]),
+                'terminal' => route('project.service.command', ['project_uuid' => $projectUuid, 'environment_uuid' => $environmentUuid, 'service_uuid' => $uuid]),
+            ],
+            default => [],
+        };
     }
 
     private function toSearchableArray(Collection $items): array

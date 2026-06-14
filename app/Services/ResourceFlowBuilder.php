@@ -186,6 +186,7 @@ class ResourceFlowBuilder
                 'icon' => self::iconFor($type, $subtype),
                 'server' => self::serverName($resource),
                 'volumes' => array_values(array_filter((array) ($resource['volumes'] ?? []))),
+                'links' => is_array($resource['links'] ?? null) ? $resource['links'] : [],
             ],
         ];
     }

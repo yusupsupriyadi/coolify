@@ -172,8 +172,8 @@ function ResourceFlowCanvas({ flow, meta }) {
     const total = flow.summary?.total || 0;
 
     const onNodeClick = useCallback((_event, node) => {
-        if (node?.type === 'resource' && node.data?.href) {
-            navigateTo(node.data.href);
+        if (node?.type === 'resource' && node.data) {
+            window.dispatchEvent(new CustomEvent('resource-flow:open', { detail: node.data }));
         }
     }, []);
 
