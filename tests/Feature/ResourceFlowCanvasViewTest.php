@@ -112,8 +112,11 @@ it('renders the resource flow canvas mount point and payload in the resources vi
     ])->render();
 
     expect($html)
-        ->toContain('Resource Flow')
         ->toContain('data-resource-flow-canvas')
+        ->toContain('data-flow-source="resource-flow-data-environment-uuid"')
+        ->toContain('data-environment="production"')
         ->toContain('resource-application-app-uuid')
-        ->toContain('Web App');
+        ->toContain('Web App')
+        ->toContain("setView('canvas')")
+        ->toContain("setView('list')");
 });

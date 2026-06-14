@@ -190,65 +190,55 @@
             </ol>
         </nav>
     </div>
-    @if ($environment->isEmpty())
-        @php($resourceFlowDataId = 'resource-flow-data-'.data_get($environment, 'uuid'))
-        <script type="application/json" id="{{ $resourceFlowDataId }}">@json($resourceFlow)</script>
-        <div class="mb-4 overflow-hidden border rounded-lg border-neutral-200 dark:border-coolgray-200 bg-white dark:bg-coolgray-100">
+    @php($resourceFlowDataId = 'resource-flow-data-'.data_get($environment, 'uuid'))
+    @php($canAddResource = auth()->user()?->can('createAnyResource'))
+    <div x-data="{ view: (localStorage.getItem('resourceView') || 'canvas'), setView(v) { this.view = v; localStorage.setItem('resourceView', v); } }">
+        <div class="flex items-center gap-2 mb-3">
             <div
-                class="flex flex-col gap-3 px-4 py-3 border-b border-neutral-200 dark:border-coolgray-200 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <div class="text-sm font-semibold text-neutral-800 dark:text-white">Resource Flow</div>
-                    <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                        Railway-style canvas grouped by environment, server, and resource.
-                    </div>
-                </div>
-                <div class="flex flex-wrap gap-2 text-xs text-neutral-600 dark:text-neutral-300">
-                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.total') }} resources</span>
-                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.applications') }} apps</span>
-                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.databases') }} databases</span>
-                    <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.services') }} services</span>
-                </div>
+                class="inline-flex p-0.5 border rounded-lg border-neutral-200 dark:border-coolgray-200 bg-neutral-100 dark:bg-coolgray-100">
+                <button type="button" @click="setView('canvas')"
+                    :class="view === 'canvas' ? 'bg-white dark:bg-coolgray-300 text-black dark:text-white shadow-sm' :
+                        'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
+                    class="flex items-center gap-1.5 px-3 h-7 text-xs font-semibold rounded-md transition-colors">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    </svg>
+                    Canvas
+                </button>
+                <button type="button" @click="setView('list')"
+                    :class="view === 'list' ? 'bg-white dark:bg-coolgray-300 text-black dark:text-white shadow-sm' :
+                        'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
+                    class="flex items-center gap-1.5 px-3 h-7 text-xs font-semibold rounded-md transition-colors">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6" />
+                        <line x1="8" y1="12" x2="21" y2="12" />
+                        <line x1="8" y1="18" x2="21" y2="18" />
+                        <line x1="3" y1="6" x2="3.01" y2="6" />
+                        <line x1="3" y1="12" x2="3.01" y2="12" />
+                        <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>
+                    List
+                </button>
             </div>
-            <div data-resource-flow-canvas data-flow-source="{{ $resourceFlowDataId }}" wire:ignore
-                class="h-[560px] w-full bg-base"></div>
         </div>
-        @can('createAnyResource')
-            <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                {{ wireNavigate() }} class="items-center justify-center coolbox">+ Add Resource</a>
-        @else
-            <div
-                class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-lg">
-                <h3 class="mb-2 text-lg font-semibold text-neutral-600 dark:text-neutral-400">No Resources Found</h3>
-                <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    This environment doesn't have any resources yet.<br>
-                    Contact your team administrator to add resources.
-                </p>
+
+        <script type="application/json" id="{{ $resourceFlowDataId }}">@json($resourceFlow)</script>
+        <div x-show="view === 'canvas'"
+            @resource-flow:sync.window="$wire.$refresh().then(() => window.mountResourceFlows && window.mountResourceFlows())">
+            <div data-resource-flow-canvas data-flow-source="{{ $resourceFlowDataId }}"
+                @if ($canAddResource) data-add-url="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" @endif
+                data-project="{{ $project->name }}" data-environment="{{ $environment->name }}" wire:ignore
+                class="w-full overflow-hidden border rounded-xl border-neutral-200 dark:border-coolgray-200 bg-base h-[calc(100vh-13rem)] min-h-[520px]">
             </div>
-        @endcan
-    @else
-        <div x-data="searchComponent()">
+        </div>
+
+        <div x-show="view === 'list'" x-cloak x-data="searchComponent()">
             <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
-            @php($resourceFlowDataId = 'resource-flow-data-'.data_get($environment, 'uuid'))
-            <script type="application/json" id="{{ $resourceFlowDataId }}">@json($resourceFlow)</script>
-            <div class="mt-4 overflow-hidden border rounded-lg border-neutral-200 dark:border-coolgray-200 bg-white dark:bg-coolgray-100">
-                <div
-                    class="flex flex-col gap-3 px-4 py-3 border-b border-neutral-200 dark:border-coolgray-200 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <div class="text-sm font-semibold text-neutral-800 dark:text-white">Resource Flow</div>
-                        <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                            Railway-style canvas grouped by environment, server, and resource.
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-2 text-xs text-neutral-600 dark:text-neutral-300">
-                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.total') }} resources</span>
-                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.applications') }} apps</span>
-                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.databases') }} databases</span>
-                        <span class="px-2 py-1 rounded bg-neutral-100 dark:bg-coolgray-200">{{ data_get($resourceFlow, 'summary.services') }} services</span>
-                    </div>
-                </div>
-                <div data-resource-flow-canvas data-flow-source="{{ $resourceFlowDataId }}" wire:ignore
-                    class="h-[560px] w-full bg-base"></div>
-            </div>
             <template
                 x-if="filteredApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0">
                 <div class="flex flex-col items-center justify-center p-8 text-center">
@@ -425,7 +415,7 @@
                 </template>
             </div>
         </div>
-    @endif
+    </div>
 
 </div>
 

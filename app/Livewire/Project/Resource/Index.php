@@ -92,6 +92,7 @@ class Index extends Component
             'tags',
             'destination.server.settings',
             'settings',
+            'persistentStorages',
         ])->get()->sortBy('name');
         $projectUuid = $this->project->uuid;
         $environmentUuid = $this->environment->uuid;
@@ -121,6 +122,7 @@ class Index extends Component
             $this->{$property} = $this->environment->{$relation}()->with([
                 'tags',
                 'destination.server.settings',
+                'persistentStorages',
             ])->get()->sortBy('name');
             $this->{$property} = $this->{$property}->map(function ($db) use ($projectUuid, $environmentUuid) {
                 $db->hrefLink = route('project.database.configuration', [
@@ -185,29 +187,41 @@ class Index extends Component
      */
     private function toFlowResources(): Collection
     {
+        $databaseSubtype = fn ($db): string => method_exists($db, 'type') ? (string) $db->type() : 'database';
+
         return collect()
-            ->merge($this->toTypedSearchableArray($this->applications, 'application'))
-            ->merge($this->toTypedSearchableArray($this->postgresqls, 'database'))
-            ->merge($this->toTypedSearchableArray($this->redis, 'database'))
-            ->merge($this->toTypedSearchableArray($this->mongodbs, 'database'))
-            ->merge($this->toTypedSearchableArray($this->mysqls, 'database'))
-            ->merge($this->toTypedSearchableArray($this->mariadbs, 'database'))
-            ->merge($this->toTypedSearchableArray($this->keydbs, 'database'))
-            ->merge($this->toTypedSearchableArray($this->dragonflies, 'database'))
-            ->merge($this->toTypedSearchableArray($this->clickhouses, 'database'))
-            ->merge($this->toTypedSearchableArray($this->services, 'service'))
+            ->merge($this->mapFlowResources($this->applications, 'application', fn ($app): string => filled($app->git_repository) ? 'git' : 'docker'))
+            ->merge($this->mapFlowResources($this->postgresqls, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->redis, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->mongodbs, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->mysqls, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->mariadbs, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->keydbs, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->dragonflies, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->clickhouses, 'database', $databaseSubtype))
+            ->merge($this->mapFlowResources($this->services, 'service', fn ($service): string => 'service'))
             ->values();
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
-    private function toTypedSearchableArray(Collection $items, string $type): array
+    private function mapFlowResources(Collection $items, string $type, \Closure $subtype): Collection
     {
-        return collect($this->toSearchableArray($items))
-            ->map(fn (array $item): array => ['type' => $type, ...$item])
-            ->values()
-            ->toArray();
+        return $items->map(fn ($item): array => [
+            'type' => $type,
+            'subtype' => $subtype($item),
+            'uuid' => $item->uuid,
+            'name' => $item->name,
+            'fqdn' => $item->fqdn ?? null,
+            'description' => $item->description ?? null,
+            'status' => $item->status ?? '',
+            'hrefLink' => $item->hrefLink ?? '',
+            'server' => $item->destination?->server?->name ?? 'Unknown',
+            'volumes' => $item->relationLoaded('persistentStorages')
+                ? $item->persistentStorages->pluck('name')->filter()->values()->all()
+                : [],
+        ])->values();
     }
 
     private function toSearchableArray(Collection $items): array

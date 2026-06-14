@@ -7,7 +7,28 @@ use Illuminate\Support\Str;
 
 class ResourceFlowBuilder
 {
+    private const CARD_WIDTH = 280;
+
+    private const CARD_HEIGHT = 132;
+
+    private const CARD_GAP_X = 24;
+
+    private const CARD_GAP_Y = 20;
+
+    private const GROUP_PAD_X = 20;
+
+    private const GROUP_PAD_TOP = 56;
+
+    private const GROUP_PAD_BOTTOM = 20;
+
+    private const GROUP_GAP_X = 96;
+
+    private const MAX_COLUMNS = 2;
+
     /**
+     * Build a Railway-style, resource-centric canvas: every resource is a card,
+     * grouped into a container per server.
+     *
      * @param  Collection<int, array<string, mixed>>  $resources
      * @return array{
      *     nodes: array<int, array<string, mixed>>,
@@ -25,33 +46,41 @@ class ResourceFlowBuilder
             ])
             ->values();
 
-        $environmentId = self::nodeId('environment', $environmentName);
-        $nodes = [self::environmentNode($environmentId, $projectName, $environmentName)];
-        $edges = [];
-
-        $x = 360;
-        $serverColumn = 0;
-
+        $nodes = [];
         $resourcesByServer = $resources->groupBy(fn (array $resource): string => self::serverName($resource));
 
-        foreach ($resourcesByServer as $serverName => $serverResources) {
-            $serverId = self::nodeId('server', $serverName);
-            $serverY = $serverColumn * 260;
-            $nodes[] = self::serverNode($serverId, $serverName, $serverResources->count(), $x, $serverY);
-            $edges[] = self::edge($environmentId, $serverId);
+        $groupX = 0;
 
-            foreach ($serverResources->values() as $index => $resource) {
+        foreach ($resourcesByServer as $serverName => $serverResources) {
+            $serverResources = $serverResources->values();
+            $count = $serverResources->count();
+            $columns = (int) min(self::MAX_COLUMNS, max(1, $count));
+            $rows = (int) ceil($count / $columns);
+
+            $innerWidth = ($columns * self::CARD_WIDTH) + (($columns - 1) * self::CARD_GAP_X);
+            $innerHeight = ($rows * self::CARD_HEIGHT) + (max(0, $rows - 1) * self::CARD_GAP_Y);
+            $groupWidth = $innerWidth + (self::GROUP_PAD_X * 2);
+            $groupHeight = $innerHeight + self::GROUP_PAD_TOP + self::GROUP_PAD_BOTTOM;
+
+            $groupId = self::nodeId('group-server', (string) $serverName);
+            $nodes[] = self::groupNode($groupId, (string) $serverName, $count, $groupX, 0, $groupWidth, $groupHeight);
+
+            foreach ($serverResources as $index => $resource) {
+                $column = $index % $columns;
+                $row = intdiv($index, $columns);
+                $x = self::GROUP_PAD_X + ($column * (self::CARD_WIDTH + self::CARD_GAP_X));
+                $y = self::GROUP_PAD_TOP + ($row * (self::CARD_HEIGHT + self::CARD_GAP_Y));
+
                 $resourceId = self::nodeId('resource-'.$resource['type'], (string) $resource['uuid']);
-                $nodes[] = self::resourceNode($resourceId, $resource, $x + 360, $serverY + ($index * 160));
-                $edges[] = self::edge($serverId, $resourceId);
+                $nodes[] = self::resourceNode($resourceId, $groupId, $resource, $x, $y);
             }
 
-            $serverColumn++;
+            $groupX += $groupWidth + self::GROUP_GAP_X;
         }
 
         return [
             'nodes' => $nodes,
-            'edges' => $edges,
+            'edges' => [],
             'summary' => [
                 'total' => $resources->count(),
                 'applications' => $resources->where('type', 'application')->count(),
@@ -65,29 +94,17 @@ class ResourceFlowBuilder
     /**
      * @return array<string, mixed>
      */
-    private static function environmentNode(string $id, string $projectName, string $environmentName): array
+    private static function groupNode(string $id, string $serverName, int $resourceCount, int $x, int $y, int $width, int $height): array
     {
         return [
             'id' => $id,
-            'type' => 'environment',
-            'position' => ['x' => 0, 'y' => 0],
-            'data' => [
-                'label' => $environmentName,
-                'project' => $projectName,
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function serverNode(string $id, string $serverName, int $resourceCount, int $x, int $y): array
-    {
-        return [
-            'id' => $id,
-            'type' => 'server',
+            'type' => 'group',
             'position' => ['x' => $x, 'y' => $y],
+            'draggable' => true,
+            'selectable' => false,
+            'style' => ['width' => $width, 'height' => $height],
             'data' => [
+                'kind' => 'server',
                 'label' => $serverName,
                 'resourceCount' => $resourceCount,
             ],
@@ -98,36 +115,101 @@ class ResourceFlowBuilder
      * @param  array<string, mixed>  $resource
      * @return array<string, mixed>
      */
-    private static function resourceNode(string $id, array $resource, int $x, int $y): array
+    private static function resourceNode(string $id, string $parentId, array $resource, int $x, int $y): array
     {
+        $status = (string) ($resource['status'] ?? '');
+        [$statusLabel, $statusColor] = self::statusMeta($status);
+        $type = (string) $resource['type'];
+        $subtype = (string) ($resource['subtype'] ?? $type);
+        $description = $resource['description'] ?? null;
+        $fqdn = $resource['fqdn'] ?? null;
+
         return [
             'id' => $id,
             'type' => 'resource',
             'position' => ['x' => $x, 'y' => $y],
+            'parentId' => $parentId,
+            'extent' => 'parent',
             'data' => [
-                'kind' => (string) $resource['type'],
+                'kind' => $type,
+                'subtype' => $subtype,
                 'label' => (string) $resource['name'],
-                'description' => $resource['description'] ?? null,
-                'fqdn' => $resource['fqdn'] ?? null,
-                'status' => (string) ($resource['status'] ?? ''),
+                'subtitle' => self::subtitle($fqdn, $description),
+                'description' => $description,
+                'fqdn' => $fqdn,
+                'status' => $status,
+                'statusLabel' => $statusLabel,
+                'statusColor' => $statusColor,
                 'href' => (string) ($resource['hrefLink'] ?? ''),
+                'icon' => self::iconFor($type, $subtype),
                 'server' => self::serverName($resource),
-                'tags' => $resource['tags'] ?? [],
+                'volumes' => array_values(array_filter((array) ($resource['volumes'] ?? []))),
             ],
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private static function edge(string $source, string $target): array
+    private static function subtitle(?string $fqdn, ?string $description): ?string
     {
-        return [
-            'id' => $source.'-to-'.$target,
-            'source' => $source,
-            'target' => $target,
-            'animated' => false,
+        if (is_string($fqdn) && $fqdn !== '') {
+            return str($fqdn)->after('://')->before('/')->value();
+        }
+
+        if (is_string($description) && $description !== '') {
+            return $description;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private static function statusMeta(string $status): array
+    {
+        $status = strtolower($status);
+
+        if (str_starts_with($status, 'running')) {
+            if (str_contains($status, 'unhealthy')) {
+                return ['Degraded', '#fcd452'];
+            }
+
+            return ['Online', '#22c55e'];
+        }
+
+        if (str_starts_with($status, 'starting') || str_starts_with($status, 'restarting')) {
+            return ['Deploying', '#fcd452'];
+        }
+
+        if (str_starts_with($status, 'degraded')) {
+            return ['Degraded', '#fcd452'];
+        }
+
+        if (str_starts_with($status, 'exited') || str_starts_with($status, 'dead') || str_starts_with($status, 'stopped')) {
+            return ['Offline', '#ef4444'];
+        }
+
+        return ['Unknown', '#737373'];
+    }
+
+    private static function iconFor(string $type, string $subtype): string
+    {
+        $map = [
+            'git' => 'github',
+            'docker' => 'docker',
+            'service' => 'docker',
+            'standalone-postgresql' => 'postgresql',
+            'standalone-redis' => 'redis',
+            'standalone-keydb' => 'redis',
+            'standalone-dragonfly' => 'redis',
+            'standalone-mysql' => 'mysql',
+            'standalone-mariadb' => 'mariadb',
+            'standalone-mongodb' => 'mongodb',
+            'standalone-clickhouse' => 'clickhouse',
         ];
+
+        $icon = $map[$subtype] ?? 'docker';
+
+        return '/svgs/'.$icon.'.svg';
     }
 
     /**
@@ -135,7 +217,7 @@ class ResourceFlowBuilder
      */
     private static function serverName(array $resource): string
     {
-        $name = data_get($resource, 'destination.server.name');
+        $name = $resource['server'] ?? data_get($resource, 'destination.server.name');
 
         if (is_string($name) && $name !== '') {
             return $name;
