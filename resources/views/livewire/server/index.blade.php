@@ -11,44 +11,58 @@
         @endcan
     </div>
     <div class="subtitle">All your servers are here.</div>
-    <div class="grid gap-4 lg:grid-cols-2 -mt-1">
+    <div class="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2 xl:grid-cols-3">
         @forelse ($servers as $server)
+            @php($serverReachable = $server->settings->is_reachable && $server->settings->is_usable && !$server->settings->force_disabled)
             <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}" {{ wireNavigate() }}
                 @class([
-                    'gap-2 border cursor-pointer coolbox group',
-                    'border-red-500' =>
-                        !$server->settings->is_reachable || $server->settings->force_disabled,
+                    'relative flex flex-col p-5 transition-all bg-white border group rounded-xl border-neutral-200 dark:bg-coolgray-100 dark:border-coolgray-200 hover:shadow-lg hover:-translate-y-0.5',
+                    'hover:border-coollabs dark:hover:border-coollabs' => $serverReachable,
+                    'border-error/60 dark:border-error/50' => !$serverReachable,
                 ])>
-                <div class="flex flex-col justify-center mx-6">
-                    <div class="font-bold dark:text-white">
-                        {{ $server->name }}
+                <div class="flex items-start gap-3">
+                    <div
+                        class="flex items-center justify-center w-10 h-10 rounded-lg shrink-0 bg-coollabs/10 text-coollabs dark:bg-coolgray-200 dark:text-warning">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z" />
+                            <path d="M15 20h-9a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h12" />
+                            <path d="M7 8v.01" />
+                            <path d="M7 16v.01" />
+                            <path d="M20 15l-2 3h3l-2 3" />
+                        </svg>
                     </div>
-                    <div class="description">
-                        {{ $server->description }}</div>
-                    <div class="flex gap-1 text-xs text-error">
-                        @if (!$server->settings->is_reachable)
-                            <span>Not reachable</span>
-                        @endif
-                        @if (!$server->settings->is_reachable && !$server->settings->is_usable)
-                            &
-                        @endif
-                        @if (!$server->settings->is_usable)
-                            <span>Not usable by Coolify</span>
-                        @endif
-                        @if ($server->settings->force_disabled)
-                            <span>Disabled by the system</span>
-                        @endif
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-black truncate dark:text-white dark:group-hover:text-white">
+                            {{ $server->name }}</div>
+                        <div class="text-xs line-clamp-2 text-neutral-500 dark:text-neutral-400">
+                            {{ $server->description ?: 'No description' }}</div>
                     </div>
                 </div>
-                <div class="flex-1"></div>
+                <div class="flex items-center gap-2 mt-4 text-xs font-medium">
+                    <span class="w-2 h-2 rounded-full {{ $serverReachable ? 'bg-success' : 'bg-error' }}"></span>
+                    <span class="{{ $serverReachable ? 'text-success' : 'text-error' }}">
+                        @if ($serverReachable)
+                            Reachable
+                        @elseif ($server->settings->force_disabled)
+                            Disabled by the system
+                        @elseif (!$server->settings->is_reachable)
+                            Not reachable
+                        @else
+                            Not usable by Coolify
+                        @endif
+                    </span>
+                </div>
             </a>
         @empty
-            <div>
-                <div>No servers found. Without a server, you won't be able to do much.</div>
+            <div
+                class="flex flex-col items-center justify-center col-span-full p-12 text-center border border-dashed rounded-xl border-neutral-300 dark:border-coolgray-300">
+                <h3 class="mb-1 text-lg font-semibold text-neutral-600 dark:text-neutral-300">No servers found</h3>
+                <p class="text-sm text-neutral-500">Without a server, you won't be able to do much.</p>
             </div>
         @endforelse
         @isset($error)
-            <div class="text-center text-error">
+            <div class="text-center col-span-full text-error">
                 <span>{{ $error }}</span>
             </div>
         @endisset
